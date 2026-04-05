@@ -1,0 +1,53 @@
+@startuml
+title Диаграмма контейнеров: Открытие депозитов онлайн (MVP)
+
+top to bottom direction
+
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Boundary(clients, "Пользователи") {
+    Person(new_client, "Новый клиент")
+    Person(existing_client, "Существующий клиент")
+}
+Person(call_operator, "Оператор кол-центра")
+Person(dep_back, "Сотрудник бэк-офиса депозитов")
+
+Container(site, "Сайт", "PHP, React")
+Container(cc, "Система кол-центра", "React, Java, Kafka consumer")
+Container(sms_gateway, "СМС-шлюз", "Внешний")
+
+Container(ib, "Интернет-банк", "ASP.NET MVC + модуль на .NET Core", "Авторизация, отображение депозитов, отправка заявок (синхронно), чтение ставок из Redis")
+Container(redis, "Кэш Redis", "Redis", "Хранит актуальные ставки депозитов")
+
+Boundary(claim_service, "Микросервис управления заявками"){
+    Container(claim_ms, "Микросервис управления заявками", "Spring Boot, PostgreSQL", "Единый реестр заявок, REST API, Kafka producer")
+    ContainerDb(claim_db, "БД заявок", "PostgreSQL", "Хранит только заявки и статусы")
+}
+
+Boundary(abs, "АБС") {
+    Container(abs_core, "АБС: ядро", "Oracle, Delphi", "Учёт, открытие депозитов")
+    Container(abs_adapter, "Адаптер очередей АБС", "Java Spring Boot", "Потребляет команды из Kafka")
+    Container(abs_rates, "Модуль ставок", "PL/SQL", "Расчёт и управление ставками")
+    Container(abs_sms, "Отправка СМС", "Существующий модуль", "Вызывает СМС-шлюз")
+}
+
+Rel(new_client, site, "Подаёт заявку", "HTTPS")
+Rel(existing_client, ib, "Подаёт заявку", "HTTPS")
+Rel(site, claim_ms, "REST API", "HTTPS")
+Rel(ib, claim_ms, "REST API", "HTTPS")
+Rel(ib, redis, "Чтение ставок", "Redis protocol")
+Rel(claim_ms, claim_db, "JDBC")
+Rel(claim_ms, cc, "Kafka topic: заявки для кол-центра", "асинхронно")
+Rel(call_operator, cc, "Работает с заявками")
+Rel(cc, claim_ms, "Обновление статуса заявки", "REST API")
+Rel(dep_back, claim_ms, "Просмотр/подтверждение заявок", "веб-интерфейс, HTTPS")
+Rel(claim_ms, abs_adapter, "Kafka topic: команды открытия депозита", "асинхронно")
+Rel(abs_adapter, abs_core, "Вызов процедур", "Oracle")
+Rel(abs_core, abs_rates, "Использует")
+Rel_R(abs_rates, redis, "Периодическая выгрузка ставок", "по расписанию")
+Rel(abs_core, abs_sms, "Вызывает")
+Rel(abs_sms, sms_gateway, "API", "HTTPS")
+
+
+@enduml

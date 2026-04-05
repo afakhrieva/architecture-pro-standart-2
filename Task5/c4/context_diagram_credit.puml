@@ -1,0 +1,39 @@
+@startuml
+title Контекстная диаграмма: Заявка на кредит онлайн
+
+top to bottom direction
+
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Person(new_client, "Новый клиент", "Не зарегистрирован в банке")
+Person(existing_client, "Существующий клиент", "Зарегистрирован, есть доступ к интернет-банку")
+Person(branch_employee, "Сотрудник отделения", "Оформляет заявки")
+Person(credit_back, "Сотрудник кредитного отдела", "Обрабатывает заявки")
+
+System_Boundary(bank, "Информационные системы Банка Стандарт") {
+    System(site, "Сайт", "Маркетинговый сайт (PHP, React)")
+    System(ib, "Интернет-банк", "ASP.NET MVC, MS SQL")
+    System(claim_ms, "Микросервис управления заявками", "Единый реестр заявок, Spring Boot, PostgreSQL, Kafka")
+    System(conveyor, "Кредитный конвейер", "Camunda")
+    System(scoring, "Система кредитного скоринга", "Python, Flask, PosgreSQL")
+    System(abs, "АБС", "Core banking, Oracle, Delphi")
+    System(sms, "СМС-шлюз")
+}
+System_Ext(bki, "Бюро кредитных историй")
+
+Rel(new_client, site, "Подаёт заявку, видит условия", "HTTPS")
+Rel(existing_client, ib, "Подаёт заявку, видит условия", "HTTPS")
+Rel(site, claim_ms, "Заявка", "REST/HTTPS")
+Rel(ib, claim_ms, "Заявка", "REST/HTTPS")
+Rel(claim_ms, conveyor, "Заявки/запрос скоринга", "Kafka/REST")
+Rel(conveyor, scoring, "Скоринг", "REST")
+Rel(scoring, bki, "REST")
+Rel(conveyor, claim_ms, "Cтатус, результат скоринга", "Kafka")
+Rel(conveyor, abs, "Команда открытия кредита", "Kafka")
+Rel(claim_ms, sms, "Отправка СМС (приглашение, изменение статуса)", "API")
+Rel(abs, sms, "Отправка СМС (открытие кредита)", "API")
+Rel(credit_back, conveyor, "Обработка заявок", "веб-интерфейс")
+Rel(branch_employee, claim_ms, "Поиск/просмотр/создание заявок", "веб-интерфейс")
+
+@enduml

@@ -1,0 +1,67 @@
+@startuml
+title Диаграмма контейнеров: Кредитный онлайн
+
+top to bottom direction
+
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Boundary(clients, "Пользователи") {
+    Person(new_client, "Новый клиент")
+    Person(existing_client, "Существующий клиент")
+}
+Person(branch_employee, "Сотрудник отделения")
+Person(credit_back, "Сотрудник кредитного отдела")
+
+Container(site, "Сайт", "PHP, React")
+Container(sms_gateway, "СМС-шлюз")
+
+Container(ib, "Интернет-банк", "ASP.NET MVC + модуль на .NET Core", "Авторизация, отображение кредитов, подача заявки (синхронно), чтение условий из Redis")
+Container(redis, "Кэш Redis", "Redis", "Хранит актуальные условия кредитов и предодобренные предложения")
+
+Boundary(claim_service, "Микросервис управления заявками") {
+    Container(claim_ms, "Микросервис управления заявками", "Spring Boot, PostgreSQL", "Единый реестр заявок, REST API, Kafka producer/consumer, отправка СМС")
+    ContainerDb(claim_db, "БД заявок", "PostgreSQL", "Хранит заявки на кредит и статусы")
+}
+
+Boundary(conveyor_system, "Кредитный конвейер") {
+    Container(conveyor, "Кредитный конвейер", "Camunda, Oracle", "Бизнес-процессы, REST API, Kafka producer/consumer, веб-интерфейс")
+}
+
+Boundary(scoring_system, "Система скоринга") {
+    Container(scoring, "Система кредитного скоринга", "Python, Flask, PostgreSQL", "Расчёт рейтинга, вызов БКИ")
+}
+
+Boundary(abs, "АБС") {
+    Container(abs_core, "АБС: ядро", "Oracle, Delphi", "Открытие кредита")
+    Container(abs_adapter, "Адаптер очередей АБС", "Java Spring Boot", "Потребляет команды из Kafka")
+}
+
+System_Ext(bki, "Бюро кредитных историй", "Внешнее")
+
+Rel(new_client, site, "Подаёт заявку, видит условия", "HTTPS")
+Rel(existing_client, ib, "Подаёт заявку, видит условия", "HTTPS")
+Rel(site, redis, "Чтение условий", "Redis protocol")
+Rel(ib, redis, "Чтение условий и предодобренных", "Redis protocol")
+Rel(site, claim_ms, "REST API (подача заявки)", "HTTPS")
+Rel(ib, claim_ms, "REST API (подача заявки)", "HTTPS")
+
+Rel(claim_ms, conveyor, "Kafka (заявка, запрос скоринга)", "асинхронно")
+Rel(conveyor, claim_ms, "Kafka (статус, результат скоринга)", "асинхронно")
+
+Rel(conveyor, scoring, "REST API (скоринг)", "синхронно")
+Rel(scoring, bki, "REST API (запрос истории)", "синхронно")
+
+Rel(conveyor, redis, "Выгрузка условий и предодобренных", "периодически (ночью)")
+
+Rel(claim_ms, abs_adapter, "Kafka (команда открытия кредита)", "асинхронно")
+Rel(abs_adapter, abs_core, "Вызов процедур", "Oracle")
+
+Rel(claim_ms, sms_gateway, "Отправка СМС (приглашение, изменение статуса)", "API")
+
+Rel(branch_employee, claim_ms, "Поиск/просмотр/создание заявок, идентификация", "веб-интерфейс")
+Rel(credit_back, conveyor, "Обработка заявок (ускоренная для предодобренных)", "веб-интерфейс")
+
+Rel(abs_core, sms_gateway, "Отправка СМС (кредит выдан)", "API")
+
+@enduml

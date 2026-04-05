@@ -1,0 +1,25 @@
+@startuml
+title Контекстная диаграмма: Передача ставок в кол-центры
+
+top to bottom direction
+
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Person(internal_op, "Оператор внутреннего кол-центра")
+Person(partner_op, "Оператор партнёрского кол-центра")
+
+System_Boundary(bank, "Банк Стандарт") {
+    System(cc_internal, "Система внутреннего кол-центра")
+    System(rates_store, "Система хранения и экспорта ставок")
+}
+
+System_Ext(cc_partner, "Система партнёрского кол-центра")
+
+Rel(internal_op, cc_internal, "Консультируется по ставкам")
+Rel(partner_op, cc_partner, "Консультируется по ставкам")
+
+Rel(cc_internal, rates_store, "Читает ставки (через внутренний механизм)")
+Rel(rates_store, cc_partner, "Получает файл со ставками (SFTP)")
+
+@enduml

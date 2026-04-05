@@ -1,0 +1,34 @@
+@startuml
+title Контекстная диаграмма: Открытие депозитов онлайн (MVP)
+
+top to bottom direction
+
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Person(new_client, "Новый клиент", "Не зарегистрирован в банке")
+Person(existing_client, "Существующий клиент", "Зарегистрирован, есть доступ к интернет-банку")
+Person(call_operator, "Оператор кол-центра", "Обзванивает клиентов по заявкам")
+Person(dep_back, "Сотрудник бэк-офиса депозитов", "Обрабатывает заявки, подтверждает депозиты")
+
+System_Boundary(bank, "Информационные системы Банка Стандарт") {
+    System(site, "Сайт", "Маркетинговый сайт (PHP, React)")
+    System(ib, "Интернет-банк", "ASP.NET MVC, MS SQL")
+    System(claim_ms, "Микросервис управления заявками", "Единый реестр заявок, Spring Boot, PostgreSQL, Kafka")
+    System(abs, "АБС", "Core banking, Oracle, Delphi")
+    System(cc, "Система кол-центра", "CRM подрядчика, React, Java")
+    System(sms, "СМС-шлюз")
+}
+
+Rel(new_client, site, "Подаёт заявку на депозит (ФИО, телефон)", "HTTPS")
+Rel(existing_client, ib, "Подаёт заявку (счёт, сумма, подтверждение СМС)", "HTTPS")
+Rel(site, claim_ms, "Отправляет заявку", "REST API")
+Rel(ib, claim_ms, "Отправляет заявку", "REST API")
+Rel(claim_ms, cc, "Передаёт заявки для звонка", "Kafka (асинхронно)")
+Rel(call_operator, cc, "Работает с заявками", "внутренний интерфейс")
+Rel(cc, claim_ms, "Обновляет статус заявки", "REST API")
+Rel(dep_back, claim_ms, "Просматривает и подтверждает заявки", "веб-интерфейс")
+Rel(claim_ms, abs, "Отправляет команду на открытие депозита", "Kafka (асинхронно)")
+Rel(abs, sms, "Отправляет СМС-уведомление", "API")
+
+@enduml

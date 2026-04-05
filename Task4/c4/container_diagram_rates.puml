@@ -1,0 +1,36 @@
+@startuml
+title Диаграмма контейнеров: Передача ставок в кол-центры
+
+top to bottom direction
+
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Person(internal_op, "Оператор внутреннего кол-центра")
+Person(partner_op, "Оператор партнёрского кол-центра")
+
+System_Ext(cc_partner, "Система партнёрского кол-центра", "Внешняя")
+
+Boundary(bank, "Банк Стандарт") {
+
+    Container(cc_internal, "Система внутреннего кол-центра", "Java Spring Boot, React", "Принимает звонки, консультирует клиентов")
+    Container(redis, "Redis (кэш ставок)", "Redis", "Хранит актуальные ставки по депозитам")
+    Container(export_svc, "Сервис экспорта ставок", "Java Spring Boot", "По расписанию читает Redis, формирует CSV, загружает на SFTP")
+
+    Boundary(abs_b, "АБС") {
+        Container(abs, "АБС (ядро)", "Oracle, Delphi", "Учёт, открытие депозитов, управление ставками")
+        Container(abs_rates, "Модуль ставок", "PL/SQL", "Расчёт и управление ставками, выгрузка в Redis")
+    }
+}
+
+
+Rel(internal_op, cc_internal, "Запрос ставок", "")
+Rel(cc_internal, redis, "Чтение ставок", "Redis protocol")
+Rel(partner_op, cc_partner, "Запрос ставок", "")
+Rel(cc_partner, export_svc, "Получение файла", "SFTP")
+Rel(export_svc, redis, "Чтение ставок по расписанию", "Redis protocol")
+Rel(export_svc, cc_partner, "Загрузка CSV-файла", "SFTP")
+Rel(abs_rates, redis, "Периодическая выгрузка ставок", "По расписанию (раз в минуту/час)")
+
+
+@enduml
